@@ -1,316 +1,275 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 
-// Data Type Interface matching database schema
-export interface Idea {
+interface Idea {
   id: string;
+  idea_id: string;
   title: string;
   slug: string;
   summary: string;
-  category: string;
-  tags: string[];
-  tier: 'free' | 'premium';
+  category_name: string;
+  subcategory_name: string;
+  tags: string;
   trend_score: number;
-  created_at?: string;
+  tier: string;
 }
 
-// Fallback data so the dashboard is visually striking immediately
-const MOCK_IDEAS: Idea[] = [
-  {
-    id: '1',
-    title: 'AI Legal Contract Summarizer',
-    slug: 'ai-legal-contract-summarizer',
-    summary: 'Automate contract analysis and risk scoring for freelancers in under 10 seconds with precise AI clause breakdown.',
-    category: 'SaaS',
-    tags: ['AI', 'Legal Tech', 'Micro-SaaS'],
-    tier: 'free',
-    trend_score: 92,
-  },
-  {
-    id: '2',
-    title: 'Hyper-Local Micro-Gym Finder',
-    slug: 'hyper-local-micro-gym-finder',
-    summary: 'Uber-style marketplace for discovering and booking private garage gym rentals on-demand.',
-    category: 'Consumer',
-    tags: ['Fitness', 'Mobile', 'Sharing Economy'],
-    tier: 'free',
-    trend_score: 78,
-  },
-  {
-    id: '3',
-    title: 'Autonomous SEO Content Auditor',
-    slug: 'autonomous-seo-content-auditor',
-    summary: 'AI agent that monitors search rank drops, identifies broken internal links, and auto-generates fixes.',
-    category: 'B2B',
-    tags: ['SEO', 'Marketing', 'AI Agents'],
-    tier: 'premium',
-    trend_score: 95,
-  },
-  {
-    id: '4',
-    title: 'B2B API Usage Anomaly Detector',
-    slug: 'b2b-api-usage-anomaly-detector',
-    summary: 'Real-time alert platform targeting fintech startups to catch rogue API billing overages before invoices land.',
-    category: 'B2B',
-    tags: ['DevOps', 'Security', 'APIs'],
-    tier: 'premium',
-    trend_score: 89,
-  },
-];
-
-export default function DashboardPage() {
-  const [ideas, setIdeas] = useState<Idea[]>(MOCK_IDEAS);
+export default function Dashboard() {
+  const [ideas, setIdeas] = useState<Idea[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [selectedTier, setSelectedTier] = useState<string>('All');
 
-  // Fetch real ideas from Supabase
   useEffect(() => {
-    async function fetchIdeas() {
-      try {
-        setLoading(true);
-        const { data, error } = await supabase
-          .from('ideas')
-          .select('*')
-          .order('trend_score', { ascending: false });
-
-        if (error) throw error;
-        if (data && data.length > 0) {
-          setIdeas(data as Idea[]);
-        }
-      } catch (err) {
-        console.info('Using fallback mock data while Supabase connects...', err);
-      } finally {
-        setLoading(false);
-      }
-    }
     fetchIdeas();
   }, []);
 
-  // Live Instant Filter Logic
-  const filteredIdeas = useMemo(() => {
-    return ideas.filter((idea) => {
-      const matchesSearch =
-        idea.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        idea.summary.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        idea.tags.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase()));
+  async function fetchIdeas() {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('ideas')
+      .select('*')
+      .order('trend_score', { ascending: false });
 
-      const matchesCategory =
-        selectedCategory === 'All' || idea.category.toLowerCase() === selectedCategory.toLowerCase();
+    if (error) {
+      console.error('Error fetching ideas:', error);
+    } else if (data) {
+      setIdeas(data);
+    }
+    setLoading(false);
+  }
 
-      const matchesTier =
-        selectedTier === 'All' || idea.tier.toLowerCase() === selectedTier.toLowerCase();
+  // Extract unique categories dynamically from DB
+  const categories = ['All', ...Array.from(new Set(ideas.map((i) => i.category_name).filter(Boolean)))];
 
-      return matchesSearch && matchesCategory && matchesTier;
-    });
-  }, [ideas, searchQuery, selectedCategory, selectedTier]);
+  // Helper to parse tags safely
+  const parseTags = (rawTags: string): string[] => {
+    if (!rawTags) return ['SaaS', 'B2B'];
+    try {
+      const parsed = JSON.parse(rawTags);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      return rawTags.split(',').map((t) => t.trim().replace(/["[\]]/g, ''));
+    }
+    return ['SaaS', 'B2B'];
+  };
+
+  // Filter ideas based on search, category, and tier
+  const filteredIdeas = ideas.filter((idea) => {
+    const matchesSearch =
+      (idea.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (idea.summary || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (idea.category_name || '').toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesCategory = selectedCategory === 'All' || idea.category_name === selectedCategory;
+    const matchesTier = selectedTier === 'All' || idea.tier?.toLowerCase() === selectedTier.toLowerCase();
+
+    return matchesSearch && matchesCategory && matchesTier;
+  });
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 selection:bg-indigo-500 selection:text-white">
-      {/* BACKGROUND DECORATION */}
-      <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/20 via-slate-950 to-slate-950" />
+    <main className="min-h-screen bg-slate-950 text-slate-100 font-sans pb-20">
+      {/* Background Glow Accents */}
+      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-[400px] bg-gradient-to-b from-indigo-600/10 via-purple-600/5 to-transparent blur-3xl pointer-events-none" />
 
-      {/* NAVIGATION BAR */}
-      <nav className="relative z-10 border-b border-slate-800/80 bg-slate-950/60 backdrop-blur-xl sticky top-0">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center font-black text-white shadow-[0_0_15px_rgba(99,102,241,0.5)]">
+      {/* Header / Hero */}
+      <header className="border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/20">
               IV
             </div>
-            <span className="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
-              IdeaVault <span className="text-indigo-400 font-normal">AI</span>
+            <span className="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-slate-400">
+              IdeaVault <span className="text-indigo-400">AI</span>
             </span>
           </div>
 
-          <div className="flex items-center gap-4">
-            <button className="text-xs font-semibold px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-[0_0_20px_rgba(99,102,241,0.3)] transition-all">
-              Unlock All 10,000+ Ideas
-            </button>
+          <div className="flex items-center space-x-4">
+            <span className="text-xs px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
+              ● Live DB Connected
+            </span>
           </div>
         </div>
-      </nav>
-
-      {/* HERO SECTION */}
-      <header className="relative z-10 max-w-5xl mx-auto pt-16 pb-12 px-4 text-center">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-indigo-500/30 bg-indigo-500/10 text-indigo-300 text-xs font-medium mb-6">
-          <span className="flex h-2 w-2 rounded-full bg-indigo-400 animate-ping" />
-          Updated Daily • 10,000+ AI-Scored Startup Blueprints
-        </div>
-        <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight bg-gradient-to-b from-white via-slate-100 to-slate-400 bg-clip-text text-transparent mb-4">
-          Discover Your Next High-Margin Venture
-        </h1>
-        <p className="text-slate-400 text-base sm:text-lg max-w-2xl mx-auto">
-          Skip 60+ hours of market research. Unlock instantly validated startup opportunities with target markets, competitor landscapes, and monetization reports.
-        </p>
       </header>
 
-      {/* MAIN CONTENT AREA */}
-      <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-24">
-        {/* SEARCH & FILTER CONTROLS */}
-        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 sm:p-6 mb-10 shadow-xl backdrop-blur-md">
-          <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-            {/* Search Input */}
-            <div className="relative w-full md:w-96">
-              <svg
-                className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-500"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
+      {/* Hero Search Section */}
+      <section className="max-w-5xl mx-auto px-6 pt-16 pb-12 text-center relative z-10">
+        <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-semibold mb-6">
+          <span>🔥 Access 10,000+ AI-Validated Startup Opportunities</span>
+        </div>
+        <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight mb-6 text-white leading-tight">
+          Discover High-Momentum <br />
+          <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
+            Micro-SaaS & AI Ideas
+          </span>
+        </h1>
+        <p className="text-slate-400 text-lg max-w-2xl mx-auto mb-10">
+          Uncover market gaps, revenue models, and instant AI validation reports backed by real-time web intelligence.
+        </p>
+
+        {/* Search Input Bar */}
+        <div className="relative max-w-2xl mx-auto">
+          <input
+            type="text"
+            placeholder="Search ideas by keyword, category, or industry..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full px-6 py-4 pl-14 rounded-2xl bg-slate-900/90 border border-slate-700/80 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent shadow-xl backdrop-blur-xl text-base transition"
+          />
+          <svg
+            className="w-6 h-6 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
+      </section>
+
+      {/* Filter Chips Bar */}
+      <section className="max-w-7xl mx-auto px-6 mb-10 relative z-10">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+          {/* Category Filter Pills */}
+          <div className="flex items-center space-x-2 overflow-x-auto w-full sm:w-auto pb-2 sm:pb-0 no-scrollbar">
+            {categories.slice(0, 8).map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                  selectedCategory === cat
+                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
+                    : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800'
+                }`}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-              <input
-                type="text"
-                placeholder="Search ideas, keywords, or tech..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
-              />
-            </div>
+                {cat}
+              </button>
+            ))}
+          </div>
 
-            {/* Filter Chips */}
-            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-              {/* Category Filters */}
-              <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl p-1 text-xs">
-                {['All', 'SaaS', 'B2B', 'Consumer'].map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => setSelectedCategory(cat)}
-                    className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
-                      selectedCategory === cat
-                        ? 'bg-indigo-600 text-white shadow-sm'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-
-              {/* Tier Filters */}
-              <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl p-1 text-xs">
-                {['All', 'Free', 'Premium'].map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setSelectedTier(t)}
-                    className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
-                      selectedTier === t
-                        ? 'bg-purple-600 text-white shadow-sm'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
-            </div>
+          {/* Tier Select */}
+          <div className="flex items-center space-x-2 shrink-0">
+            {['All', 'Free', 'Premium'].map((tier) => (
+              <button
+                key={tier}
+                onClick={() => setSelectedTier(tier)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                  selectedTier === tier
+                    ? 'bg-slate-800 text-white border border-slate-700'
+                    : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                {tier}
+              </button>
+            ))}
           </div>
         </div>
+      </section>
 
-        {/* IDEAS GRID */}
+      {/* Ideas Grid */}
+      <section className="max-w-7xl mx-auto px-6 relative z-10">
         {loading ? (
-          <div className="text-center py-20 text-slate-500">Loading startup ideas...</div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3, 4, 5, 6].map((n) => (
+              <div key={n} className="h-64 rounded-2xl bg-slate-900/50 border border-slate-800 animate-pulse p-6" />
+            ))}
+          </div>
         ) : filteredIdeas.length === 0 ? (
-          <div className="text-center py-20 text-slate-500 bg-slate-900/40 rounded-2xl border border-slate-800">
-            No ideas matched your search criteria. Try adjusting your filters.
+          <div className="text-center py-20 bg-slate-900/40 rounded-3xl border border-slate-800">
+            <p className="text-slate-400 text-lg">No startup ideas found matching your criteria.</p>
+            <button
+              onClick={() => {
+                setSearchQuery('');
+                setSelectedCategory('All');
+                setSelectedTier('All');
+              }}
+              className="mt-4 px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-500 transition"
+            >
+              Reset Filters
+            </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredIdeas.map((idea) => {
-              const isPremium = idea.tier === 'premium';
+              const tagsList = parseTags(idea.tags);
+              const isPremium = idea.tier?.toLowerCase() === 'premium';
 
               return (
                 <div
-                  key={idea.id}
-                  className="group relative bg-slate-900/60 border border-slate-800/80 hover:border-indigo-500/50 rounded-2xl p-6 transition-all duration-300 hover:shadow-[0_0_30px_rgba(99,102,241,0.15)] flex flex-col justify-between overflow-hidden"
+                  key={idea.id || idea.slug}
+                  className="group relative rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 p-6 flex flex-col justify-between transition-all duration-300 hover:shadow-2xl hover:shadow-indigo-500/10 hover:-translate-y-1"
                 >
-                  {/* TOP CARD CONTENT */}
                   <div>
-                    {/* Header Row: Category Tag & Glowing Trend Score */}
+                    {/* Top Badges */}
                     <div className="flex items-center justify-between mb-4">
-                      <span className="px-2.5 py-1 rounded-md bg-slate-800 text-slate-300 text-xs font-semibold uppercase tracking-wider">
-                        {idea.category}
+                      <span className="text-[11px] font-semibold px-2.5 py-1 rounded-md bg-slate-800 text-slate-300 border border-slate-700">
+                        {idea.category_name || 'SaaS'}
                       </span>
-
-                      {/* Glowing Trend Badge */}
-                      <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs px-2.5 py-1 rounded-full font-bold shadow-[0_0_12px_rgba(16,185,129,0.2)]">
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                        </svg>
-                        <span>{idea.trend_score}/100</span>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xs font-bold text-amber-400 bg-amber-400/10 px-2.5 py-1 rounded-full border border-amber-400/20 flex items-center gap-1">
+                          🔥 {idea.trend_score || 85}
+                        </span>
+                        {isPremium ? (
+                          <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-1 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                            PRO
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-1 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                            FREE
+                          </span>
+                        )}
                       </div>
                     </div>
 
-                    {/* Title */}
-                    <h3 className="text-xl font-bold text-white mb-2 group-hover:text-indigo-400 transition-colors">
+                    {/* Idea Title */}
+                    <h3 className="text-xl font-bold text-white mb-2 group-hover:text-indigo-300 transition-colors line-clamp-2">
                       {idea.title}
                     </h3>
 
+                    {/* Subcategory */}
+                    {idea.subcategory_name && (
+                      <p className="text-xs text-indigo-400/90 font-medium mb-3">
+                        ↳ {idea.subcategory_name}
+                      </p>
+                    )}
+
                     {/* Summary */}
-                    <p className="text-slate-400 text-sm leading-relaxed mb-6">
+                    <p className="text-slate-400 text-sm line-clamp-3 mb-6 leading-relaxed">
                       {idea.summary}
                     </p>
                   </div>
 
-                  {/* BOTTOM CARD CONTENT */}
                   <div>
                     {/* Tags */}
                     <div className="flex flex-wrap gap-1.5 mb-6">
-                      {idea.tags.map((tag) => (
-                        <span
-                          key={tag}
-                          className="text-xs px-2 py-0.5 rounded bg-slate-950 text-slate-500 border border-slate-800/60"
-                        >
+                      {tagsList.slice(0, 3).map((tag, i) => (
+                        <span key={i} className="text-[11px] text-slate-400 bg-slate-800/60 px-2 py-0.5 rounded">
                           #{tag}
                         </span>
                       ))}
                     </div>
 
-                    {/* Action Button */}
-                    <a
-                      href={`/idea/${idea.slug}`}
-                      className="inline-flex items-center justify-center w-full py-2.5 rounded-xl bg-slate-800 hover:bg-indigo-600 text-white text-xs font-semibold transition-all group-hover:shadow-[0_0_15px_rgba(99,102,241,0.4)]"
+                    {/* View Details Action */}
+                    <Link
+                      href={`/idea/${idea.slug || idea.idea_id}`}
+                      className="w-full flex items-center justify-center space-x-2 py-3 rounded-xl bg-slate-800 hover:bg-indigo-600 text-slate-200 hover:text-white text-xs font-bold transition-all duration-200 border border-slate-700 hover:border-transparent"
                     >
-                      View AI Validation Report →
-                    </a>
+                      <span>Explore Idea & AI Report</span>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                      </svg>
+                    </Link>
                   </div>
-
-                  {/* PREMIUM LOCK OVERLAY (Visible on Premium items) */}
-                  {isPremium && (
-                    <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-[3px] z-20 flex flex-col items-center justify-center p-6 text-center border border-amber-500/30 rounded-2xl">
-                      <div className="h-10 w-10 rounded-full bg-amber-500/10 border border-amber-500/40 flex items-center justify-center mb-3 text-amber-400">
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                        </svg>
-                      </div>
-                      <span className="text-xs font-bold text-amber-400 tracking-wider uppercase mb-1">
-                        PRO EXCLUSIVE IDEA
-                      </span>
-                      <h4 className="text-base font-bold text-white mb-2">
-                        {idea.title}
-                      </h4>
-                      <p className="text-slate-400 text-xs mb-4 max-w-xs">
-                        Unlock target customer personas, competitive moats, and monetization strategies.
-                      </p>
-                      <button className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-bold text-xs shadow-[0_0_20px_rgba(245,158,11,0.3)] transition-all">
-                        Unlock Instant Access ($9)
-                      </button>
-                    </div>
-                  )}
                 </div>
               );
             })}
           </div>
         )}
-      </main>
-    </div>
+      </section>
+    </main>
   );
 }
