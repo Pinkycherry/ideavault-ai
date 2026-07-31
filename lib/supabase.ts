@@ -1,17 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Access Supabase credentials from environment variables
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+// Direct, fail-safe connection to your Supabase project
+const supabaseUrl =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  'https://jqzadwobnfypmytcbpkw.supabase.co';
 
-// Fallback warning for zero-config visual testing
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn(
-    'Supabase URL or Anon Key is missing. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to your environment variables.'
-  );
-}
+const supabaseAnonKey =
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  'PASTE_YOUR_COPIED_ANON_KEY_HERE';
 
-export const supabase = createClient(
-  supabaseUrl || 'https://xyzcompany.supabase.co',
-  supabaseAnonKey || 'public-anon-key'
-);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
